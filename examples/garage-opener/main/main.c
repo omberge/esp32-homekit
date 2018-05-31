@@ -21,8 +21,8 @@
 #define PINCODE "111-11-111"
 #define ARRAY_SIZE(array) (sizeof(array) / sizeof(array[0]))
 
-#define EXAMPLE_ESP_WIFI_SSID "hydrogen"
-#define EXAMPLE_ESP_WIFI_PASS "vindstyrke"
+#define EXAMPLE_ESP_WIFI_SSID ""
+#define EXAMPLE_ESP_WIFI_PASS ""
 
 static gpio_num_t ONBOARD_BLUE_LED = GPIO_NUM_2;
 static gpio_num_t SWITCH1_PORT = GPIO_NUM_22;
