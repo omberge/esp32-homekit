@@ -40,54 +40,36 @@ static void* a;
 static void* _ev_handle_target;
 static void* _ev_handle_currentstate;
 
-static int led = false;
-/*
-void* led_read(void* arg)
-{
-  printf("[MAIN] LED READ\n");
-  return (void*)led;
-}
-
-void led_write(void* arg, void* value, int len)
-{
-  printf("[MAIN] LED WRITE. %d\n", (int)value);
-
-  led = (int)value;
-  if (value)
-  {
-    led = true;
-    gpio_set_level(ONBOARD_BLUE_LED, 1);
-  }
-  else
-  {
-    led = false;
-    gpio_set_level(ONBOARD_BLUE_LED, 0);
-  }
-
-  if (_ev_handle)
-  {
-    hap_event_response(a, _ev_handle, (void*)led);
-  }
-
-  return;
-}
-
-void led_notify(void* arg, void* ev_handle, bool enable)
-{
-  if (enable)
-  {
-    _ev_handle = ev_handle;
-  }
-  else
-  {
-    _ev_handle = NULL;
-  }
-}
-*/
-
 int garagedoor_target = 0;
 int garagedoor_currentstate = 0;
 int garagedoor_obstruction = 0;
+
+void current_state_monitoring_task(void* arm)
+{
+  while(1)
+  {
+    
+    int i = 0;
+
+    if (!gpio_get_level(SWITCH1_PORT) && !gpio_get_level(SWITCH2_PORT))
+      i = 0; // FULLY OPEN
+    else if (!gpio_get_level(SWITCH1_PORT) && gpio_get_level(SWITCH2_PORT))
+      i = 1; // FULLY CLOSED
+    else if (gpio_get_level(SWITCH1_PORT) && !gpio_get_level(SWITCH2_PORT))
+      i = 2; // OPENING, reported as fully open
+    else if (gpio_get_level(SWITCH1_PORT) && gpio_get_level(SWITCH2_PORT))
+      i = 3; // Closing, reported as fully closed
+
+    garagedoor_currentstate = i;
+    
+    hap_event_response(a, _ev_handle_currentstate, (void*)garagedoor_currentstate);
+    
+    vTaskDelay( 1000 / portTICK_RATE_MS ); // Run every 1 second
+  }
+  
+}
+
+
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 void* garagedoor_gettarget(void* arg)
@@ -137,48 +119,7 @@ void garagedoor_target_notify(void* arg, void* ev_handle, bool enable)
 void* garagedoor_getcurrentstate(void* arg)
 {
   printf("==>> [MAIN] garagedoor_getcurrentstate\n");
-
-  int i = 0;
-
-  if (!gpio_get_level(SWITCH1_PORT) && !gpio_get_level(SWITCH2_PORT))
-    i = 0; // FULLY OPEN
-  else if (!gpio_get_level(SWITCH1_PORT) && gpio_get_level(SWITCH2_PORT))
-    i = 1; // FULLY CLOSED
-  else if (gpio_get_level(SWITCH1_PORT) && !gpio_get_level(SWITCH2_PORT))
-    i = 2; // OPENING, reported as fully open
-  else if (gpio_get_level(SWITCH1_PORT) && gpio_get_level(SWITCH2_PORT))
-    i = 3; // Closing, reported as fully closed
-
-  garagedoor_currentstate = i;
-
-  if (_ev_handle_currentstate)
-  {
-    hap_event_response(a, _ev_handle_currentstate, (void*)garagedoor_currentstate);
-  }
-
   return (void*)garagedoor_currentstate;
-}
-
-void garagedoor_setcurrentstate(void* arg, void* value, int len)
-{
-
-  printf("==>> [MAIN] garagedoor_setcurrentstate: %d\n", (int)value);
-
-  if (value)
-  {
-    gpio_set_level(ONBOARD_BLUE_LED, 1);
-  }
-  else
-  {
-    gpio_set_level(ONBOARD_BLUE_LED, 0);
-  }
-
-  if (_ev_handle_target)
-  {
-    hap_event_response(a, _ev_handle_target, (void*)garagedoor_target);
-  }
-
-  return;
 }
 
 void garagedoor_currentstate_notify(void* arg, void* ev_handle, bool enable)
@@ -227,8 +168,8 @@ void hap_object_init(void* arg)
 
   struct hap_characteristic cc[] =
   {
-    {HAP_CHARACTER_CURRENT_DOOR_STATE,  (void*)garagedoor_currentstate, NULL, garagedoor_getcurrentstate, garagedoor_setcurrentstate, garagedoor_currentstate_notify},
-    {HAP_CHARACTER_TARGET_DOORSTATE,    (void*)garagedoor_target,       NULL, garagedoor_gettarget,       garagedoor_settarget,       garagedoor_target_notify},
+    {HAP_CHARACTER_CURRENT_DOOR_STATE,  (void*)garagedoor_currentstate, NULL, garagedoor_getcurrentstate, NULL,                 garagedoor_currentstate_notify},
+    {HAP_CHARACTER_TARGET_DOORSTATE,    (void*)garagedoor_target,       NULL, garagedoor_gettarget,       garagedoor_settarget, garagedoor_target_notify},
     {HAP_CHARACTER_OBSTRUCTION_DETECTED,(void*)garagedoor_obstruction,  NULL, garagedoor_getobstruction,  NULL,                 NULL},
   };
 
@@ -314,6 +255,9 @@ void app_main()
 
   gpio_pad_select_gpio(SWITCH2_PORT);
   gpio_set_direction(SWITCH2_PORT, GPIO_MODE_INPUT);
+  
+  xTaskCreate( &current_state_monitoring_task, "current_state", 4096, NULL, 5, NULL );
+
 
 
   wifi_init_sta();
