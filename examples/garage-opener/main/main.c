@@ -49,7 +49,7 @@ void current_state_monitoring_task(void* arm)
   while(1)
   {
     
-    int i = 0;
+    static int i = 0;
 
     if (!gpio_get_level(SWITCH1_PORT) && !gpio_get_level(SWITCH2_PORT))
       i = 0; // FULLY OPEN
@@ -60,9 +60,12 @@ void current_state_monitoring_task(void* arm)
     else if (gpio_get_level(SWITCH1_PORT) && gpio_get_level(SWITCH2_PORT))
       i = 3; // Closing, reported as fully closed
 
-    garagedoor_currentstate = i;
-    
-    hap_event_response(a, _ev_handle_currentstate, (void*)garagedoor_currentstate);
+    if (garagedoor_currentstate != i) // Only notify on change
+    {
+      garagedoor_currentstate = i;
+      printf("==>> [MAIN] garagedoor_currentstate = %d\n", garagedoor_currentstate);
+      hap_event_response(a, _ev_handle_currentstate, (void*)garagedoor_currentstate);
+    }
     
     vTaskDelay( 1000 / portTICK_RATE_MS ); // Run every 1 second
   }
@@ -255,10 +258,8 @@ void app_main()
 
   gpio_pad_select_gpio(SWITCH2_PORT);
   gpio_set_direction(SWITCH2_PORT, GPIO_MODE_INPUT);
-  
-  xTaskCreate( &current_state_monitoring_task, "current_state", 4096, NULL, 5, NULL );
-
-
+  // http://esp32.info/docs/esp_idf/html/dd/d3c/group__xTaskCreate.html
+  xTaskCreate( &current_state_monitoring_task, "curr_state_mon", 4096, NULL, 5, NULL );
 
   wifi_init_sta();
 }
