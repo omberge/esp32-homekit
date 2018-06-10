@@ -13,7 +13,7 @@
 
 #include "hap.h"
 
-
+#include "my_ssid.h"
 
 #define TAG "SWITCH"
 
@@ -21,15 +21,6 @@
 #define MANUFACTURER_NAME   "YOUNGHYUN"
 #define MODEL_NAME  "ESP32_ACC"
 #define ARRAY_SIZE(array) (sizeof(array) / sizeof(array[0]))
-
-#if 1
-#define EXAMPLE_ESP_WIFI_SSID "unibj"
-#define EXAMPLE_ESP_WIFI_PASS "12673063"
-#endif
-#if 0
-#define EXAMPLE_ESP_WIFI_SSID "NO_RUN"
-#define EXAMPLE_ESP_WIFI_PASS "1qaz2wsx"
-#endif
 
 static gpio_num_t LED_PORT = GPIO_NUM_2;
 
