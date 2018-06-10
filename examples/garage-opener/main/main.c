@@ -10,6 +10,7 @@
 #include "lwip/err.h"
 #include "lwip/sys.h"
 #include "nvs_flash.h"
+#include "my_ssid.h"
 
 #include "hap.h"
 
@@ -20,9 +21,6 @@
 #define MODEL_NAME  "ESP32_GARAGE_OPENER"
 #define PINCODE "111-11-111"
 #define ARRAY_SIZE(array) (sizeof(array) / sizeof(array[0]))
-
-#define EXAMPLE_ESP_WIFI_SSID ""
-#define EXAMPLE_ESP_WIFI_PASS ""
 
 static gpio_num_t ONBOARD_BLUE_LED = GPIO_NUM_2;
 static gpio_num_t SWITCH1_PORT = GPIO_NUM_22;
@@ -148,7 +146,7 @@ void* garagedoor_getobstruction(void* arg)
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
-static bool _identifed = false;
+//static bool _identifed = false;
 
 void* identify_read(void* arg)
 {
