@@ -52,19 +52,20 @@ void current_state_monitoring_task(void* arm)
     static int i = 0;
 
     if (!gpio_get_level(SWITCH1_PORT) && !gpio_get_level(SWITCH2_PORT))
-      i = 0; // FULLY OPEN
+      i = 0; // OPEN
     else if (!gpio_get_level(SWITCH1_PORT) && gpio_get_level(SWITCH2_PORT))
-      i = 1; // FULLY CLOSED
+      i = 1; // CLOSED
     else if (gpio_get_level(SWITCH1_PORT) && !gpio_get_level(SWITCH2_PORT))
-      i = 2; // OPENING, reported as fully open
+      i = 2; // OPENING
     else if (gpio_get_level(SWITCH1_PORT) && gpio_get_level(SWITCH2_PORT))
-      i = 3; // Closing, reported as fully closed
+      i = 3; // CLOSING
 
     if (garagedoor_currentstate != i) // Only notify on change
     {
       garagedoor_currentstate = i;
       printf("==>> [MAIN] garagedoor_currentstate = %d\n", garagedoor_currentstate);
-      hap_event_response(a, _ev_handle_currentstate, (void*)garagedoor_currentstate);
+      if (_ev_handle_currentstate)
+        hap_event_response(a, _ev_handle_currentstate, (void*)garagedoor_currentstate);
     }
     
     vTaskDelay( 1000 / portTICK_RATE_MS ); // Run every 1 second
