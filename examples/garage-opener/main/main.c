@@ -25,7 +25,8 @@
 static gpio_num_t ONBOARD_BLUE_LED = GPIO_NUM_2;
 static gpio_num_t SWITCH1_PORT = GPIO_NUM_22;
 static gpio_num_t SWITCH2_PORT = GPIO_NUM_23;
-
+static gpio_num_t BUTTON_PORT = GPIO_NUM_0;
+static gpio_num_t RELAY_PORT = GPIO_NUM_4;
 
 /* FreeRTOS event group to signal when we are connected & ready to make a request */
 static EventGroupHandle_t wifi_event_group;
@@ -58,10 +59,21 @@ void current_state_monitoring_task(void* arm)
     else if (gpio_get_level(SWITCH1_PORT) && gpio_get_level(SWITCH2_PORT))
       i = 3; // CLOSING
 
+    if (!gpio_get_level(BUTTON_PORT)) // Low when button is pressed
+      i = 4; // OBSTRUCTED
+    
     if (garagedoor_currentstate != i) // Only notify on change
     {
       garagedoor_currentstate = i;
-      printf("==>> [MAIN] garagedoor_currentstate = %d\n", garagedoor_currentstate);
+      switch(garagedoor_currentstate)
+      {
+        case 0: printf("==>> [MAIN] garagedoor_currentstate = %d OPEN      \n", garagedoor_currentstate); break;
+        case 1: printf("==>> [MAIN] garagedoor_currentstate = %d CLOSED    \n", garagedoor_currentstate); break;
+        case 2: printf("==>> [MAIN] garagedoor_currentstate = %d OPENING   \n", garagedoor_currentstate); break;
+        case 3: printf("==>> [MAIN] garagedoor_currentstate = %d CLOSING   \n", garagedoor_currentstate); break;
+        case 4: printf("==>> [MAIN] garagedoor_currentstate = %d OBSTRUCTED\n", garagedoor_currentstate); break;
+      }
+      //printf("==>> [MAIN] garagedoor_currentstate = %d\n", garagedoor_currentstate);
       if (_ev_handle_currentstate)
         hap_event_response(a, _ev_handle_currentstate, (void*)garagedoor_currentstate);
     }
@@ -88,12 +100,16 @@ void garagedoor_settarget(void* arg, void* value, int len)
 
   if (value)
   {
-    gpio_set_level(ONBOARD_BLUE_LED, 1);
+    gpio_set_level(ONBOARD_BLUE_LED, 0);
   }
   else
   {
-    gpio_set_level(ONBOARD_BLUE_LED, 0);
+    gpio_set_level(ONBOARD_BLUE_LED, 1);
   }
+
+  gpio_set_level(RELAY_PORT, 1);
+  vTaskDelay(50);
+  gpio_set_level(RELAY_PORT, 0);
 
   if (_ev_handle_target)
   {
@@ -252,11 +268,18 @@ void app_main()
   gpio_pad_select_gpio(ONBOARD_BLUE_LED);
   gpio_set_direction(ONBOARD_BLUE_LED, GPIO_MODE_OUTPUT);
 
+  gpio_pad_select_gpio(RELAY_PORT);
+  gpio_set_direction(RELAY_PORT, GPIO_MODE_OUTPUT);
+
   gpio_pad_select_gpio(SWITCH1_PORT);
   gpio_set_direction(SWITCH1_PORT, GPIO_MODE_INPUT);
 
   gpio_pad_select_gpio(SWITCH2_PORT);
   gpio_set_direction(SWITCH2_PORT, GPIO_MODE_INPUT);
+
+  gpio_pad_select_gpio(BUTTON_PORT);
+  gpio_set_direction(BUTTON_PORT, GPIO_MODE_INPUT);
+
   // http://esp32.info/docs/esp_idf/html/dd/d3c/group__xTaskCreate.html
   xTaskCreate( &current_state_monitoring_task, "curr_state_mon", 4096, NULL, 5, NULL );
 
