@@ -28,20 +28,19 @@ static gpio_num_t SWITCH2_PORT = GPIO_NUM_23;
 static gpio_num_t BUTTON_PORT = GPIO_NUM_0;
 static gpio_num_t RELAY_PORT = GPIO_NUM_4;
 
-/* FreeRTOS event group to signal when we are connected & ready to make a request */
+// FreeRTOS event group to signal when we are connected & ready to make a request
 static EventGroupHandle_t wifi_event_group;
 const int WIFI_CONNECTED_BIT = BIT0;
 
-/* The event group allows multiple bits for each event,
-but we only care about one event - are we connected
-to the AP with an IP? */
+// The event group allows multiple bits for each event, but we only care about one event - are we connected to the AP with an IP?
 static void* a;
 static void* _ev_handle_target;
 static void* _ev_handle_currentstate;
+static void* _ev_handle_obstructed;
 
 int garagedoor_target = 0;
 int garagedoor_currentstate = 0;
-int garagedoor_obstruction = 0;
+bool garagedoor_obstructed  = false;
 
 void current_state_monitoring_task(void* arm)
 {
@@ -60,7 +59,10 @@ void current_state_monitoring_task(void* arm)
       i = 3; // CLOSING
 
     if (!gpio_get_level(BUTTON_PORT)) // Low when button is pressed
+    {
       i = 4; // OBSTRUCTED
+      garagedoor_obstructed = true;
+    }
     
     if (garagedoor_currentstate != i) // Only notify on change
     {
@@ -71,11 +73,15 @@ void current_state_monitoring_task(void* arm)
         case 1: printf("==>> [MAIN] garagedoor_currentstate = %d CLOSED    \n", garagedoor_currentstate); break;
         case 2: printf("==>> [MAIN] garagedoor_currentstate = %d OPENING   \n", garagedoor_currentstate); break;
         case 3: printf("==>> [MAIN] garagedoor_currentstate = %d CLOSING   \n", garagedoor_currentstate); break;
-        case 4: printf("==>> [MAIN] garagedoor_currentstate = %d OBSTRUCTED\n", garagedoor_currentstate); break;
+        case 4: printf("==>> [MAIN] garagedoor_currentstate = %d STOPPED   \n", garagedoor_currentstate); break;
       }
-      //printf("==>> [MAIN] garagedoor_currentstate = %d\n", garagedoor_currentstate);
+
       if (_ev_handle_currentstate)
         hap_event_response(a, _ev_handle_currentstate, (void*)garagedoor_currentstate);
+
+      if (_ev_handle_obstructed)
+        hap_event_response(a, _ev_handle_obstructed, (void*)garagedoor_obstructed);
+
     }
     
     vTaskDelay( 1000 / portTICK_RATE_MS ); // Run every 1 second
@@ -158,11 +164,24 @@ void garagedoor_currentstate_notify(void* arg, void* ev_handle, bool enable)
 void* garagedoor_getobstruction(void* arg)
 {
   printf("==>> [MAIN] garagedoor_getobstruction\n");
-  return (void*)garagedoor_obstruction;
+  return (void*)garagedoor_obstructed;
+}
+
+void garagedoor_obstructed_notify(void* arg, void* ev_handle, bool enable)
+{
+  printf("==>> [MAIN] garagedoor_obstructed_notify\n");
+  if (enable)
+  {
+    _ev_handle_obstructed = ev_handle;
+  }
+  else
+  {
+    _ev_handle_obstructed = NULL;
+  }
+  return;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
-//static bool _identifed = false;
 
 void* identify_read(void* arg)
 {
@@ -174,21 +193,21 @@ void hap_object_init(void* arg)
   void* accessory_object = hap_accessory_add(a);
   struct hap_characteristic cs[] = 
   {
-    {HAP_CHARACTER_IDENTIFY,            (void*)true,                NULL, identify_read,  NULL,       NULL},
-    {HAP_CHARACTER_MANUFACTURER,        (void*)MANUFACTURER_NAME,   NULL, NULL,           NULL,       NULL},
-    {HAP_CHARACTER_MODEL,               (void*)MODEL_NAME,          NULL, NULL,           NULL,       NULL},
-    {HAP_CHARACTER_NAME,                (void*)ACCESSORY_NAME,      NULL, NULL,           NULL,       NULL},
-    {HAP_CHARACTER_SERIAL_NUMBER,       (void*)"0123456789",        NULL, NULL,           NULL,       NULL},
-    {HAP_CHARACTER_FIRMWARE_REVISION,   (void*)"1.0",               NULL, NULL,           NULL,       NULL},
+    {HAP_CHARACTER_IDENTIFY,            (void*)true,                    NULL, identify_read,              NULL,                 NULL},
+    {HAP_CHARACTER_MANUFACTURER,        (void*)MANUFACTURER_NAME,       NULL, NULL,                       NULL,                 NULL},
+    {HAP_CHARACTER_MODEL,               (void*)MODEL_NAME,              NULL, NULL,                       NULL,                 NULL},
+    {HAP_CHARACTER_NAME,                (void*)ACCESSORY_NAME,          NULL, NULL,                       NULL,                 NULL},
+    {HAP_CHARACTER_SERIAL_NUMBER,       (void*)"0123456789",            NULL, NULL,                       NULL,                 NULL},
+    {HAP_CHARACTER_FIRMWARE_REVISION,   (void*)"1.0",                   NULL, NULL,                       NULL,                 NULL},
   };
 
   hap_service_and_characteristics_add(a, accessory_object, HAP_SERVICE_ACCESSORY_INFORMATION, cs, ARRAY_SIZE(cs));
 
-  struct hap_characteristic cc[] =
+  struct hap_characteristic cc[] = 
   {
     {HAP_CHARACTER_CURRENT_DOOR_STATE,  (void*)garagedoor_currentstate, NULL, garagedoor_getcurrentstate, NULL,                 garagedoor_currentstate_notify},
     {HAP_CHARACTER_TARGET_DOORSTATE,    (void*)garagedoor_target,       NULL, garagedoor_gettarget,       garagedoor_settarget, garagedoor_target_notify},
-    {HAP_CHARACTER_OBSTRUCTION_DETECTED,(void*)garagedoor_obstruction,  NULL, garagedoor_getobstruction,  NULL,                 NULL},
+    {HAP_CHARACTER_OBSTRUCTION_DETECTED,(void*)garagedoor_obstructed,   NULL, garagedoor_getobstruction,  NULL,                 garagedoor_obstructed_notify},
   };
 
   hap_service_and_characteristics_add(a, accessory_object, HAP_SERVICE_GARAGE_DOOR_OPENER, cc, ARRAY_SIZE(cc));
