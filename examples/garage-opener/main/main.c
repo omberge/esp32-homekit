@@ -63,6 +63,11 @@ void current_state_monitoring_task(void* arm)
       i = 4; // OBSTRUCTED
       garagedoor_obstructed = true;
     }
+    else
+    {
+      garagedoor_obstructed = false;
+    }
+
     
     if (garagedoor_currentstate != i) // Only notify on change
     {
@@ -276,8 +281,8 @@ void wifi_init_sta()
   ESP_ERROR_CHECK(esp_wifi_start() );
 
   ESP_LOGI(TAG, "wifi_init_sta finished.");
-  ESP_LOGI(TAG, "connect to ap SSID:%s password:%s",
-  EXAMPLE_ESP_WIFI_SSID, EXAMPLE_ESP_WIFI_PASS);
+  ESP_LOGI(TAG, "connect to ap SSID:%s password: yyy",
+  EXAMPLE_ESP_WIFI_SSID);
 }
 
 void app_main()
